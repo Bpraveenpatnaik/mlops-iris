@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from ml_utils import load_model, predict, retrain
 from typing import List
+from datetime import date, datetime
+today = date.today() 
 
 # defining the main app
 app = FastAPI(title="Iris Predictor", docs_url="/")
@@ -22,7 +24,7 @@ class QueryIn(BaseModel):
 # class which is returned in the response
 class QueryOut(BaseModel):
     flower_class: str
-
+    timestamp: datetime
 # class which is expected in the payload while re-training
 class FeedbackIn(BaseModel):
     sepal_length: float

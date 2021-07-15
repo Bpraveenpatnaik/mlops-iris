@@ -3,6 +3,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier
+from datetime import date, datetime
+today = date.today()
 
 # define a Gaussain NB classifier
 clf = GaussianNB()
@@ -26,8 +28,8 @@ def load_model():
     # calculate the print the accuracy score
     acc = accuracy_score(y_test, clf.predict(X_test))
     acc1 = accuracy_score(y_test, clf1.predict(X_test))
-    print(f"Gaussian Model trained with accuracy: {round(acc, 3)}")
-    print(f"DecisionTree Model trained with accuracy: {round(acc, 3)}")
+    print(f"Gaussian Model trained with accuracy: {round(acc, 3)}", today)
+    print(f"DecisionTree Model trained with accuracy: {round(acc, 3)}", today)
 
 # function to predict the flower using the model
 def predict(query_data):
