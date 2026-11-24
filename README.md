@@ -1,20 +1,39 @@
-# ML-Ops Demo/Assignment
+# Iris Prediction API with Model Selection and CI/CD
 
-This repository contains code which demonstrates ML-Ops using a `FastAPI` application which predicts the flower class using the IRIS dataset (https://scikit-learn.org/stable/auto_examples/datasets/plot_iris_dataset.html)
+A FastAPI service that predicts the species of an Iris flower from four measurements. On startup it trains several classifiers and serves whichever one has the best cross-validated accuracy. It also has a feedback endpoint that retrains the model with labelled samples from users.
 
-## Running Instructions
-- Create a fork of the repo using the `fork` button.
-- Clone your fork using `git clone https://github.com/Bpraveenpatnaik/mlops-iris.git/
-- Install dependencies using `pip3 install requirements.txt`
-- Run application using `python3 main.py`
-- Run tests using `pytest`
+Started from the [PGCSEDS-IIITH/mlops-iris](https://github.com/PGCSEDS-IIITH/mlops-iris) course template (IIIT Hyderabad).
 
-## CI/CD
-- `build` (test) for all the pull requests
-- `build` (test) and `upload_zip` for all pushes
+## Features
+- **Model selection:** Gaussian Naive Bayes and a Decision Tree are both scored with 5-fold cross-validation on the training split. The better one is used, and its accuracy on a held-out test split is logged.
+- **Traceable predictions:** each response includes the predicted class, the model that made it, and a UTC timestamp.
+- **Feedback loop:** `/feedback_loop` adds labelled samples to the training data and refits. Earlier data is kept, so the model doesn't forget the other classes.
+- **Input validation:** measurements must be positive, and feedback labels must be one of the three species.
+- **CI/CD:** GitHub Actions runs the tests with a coverage gate (90%) on every push and PR. Pushes also get a zipped release artifact.
 
-## Assignment Tasks
-1. Change this README to add your name here: <your-name>. Add and commit changes to a new branch and create a pull request ONLY TO YOUR OWN FORK to see the CI/CD build happening. If the build succeeds, merge the pull request with master and see the CI/CD `upload_zip` take place.
-2. Add 2 more unit tests of your choice to `test_app.py` and make sure they are passing.
-3. Add one more classifier to startup and use only the one with better accuracy.
-4. Add the attribute `timestamp` to the response and return the current time with it. 
+## API
+| Method | Route | Description |
+|---|---|---|
+| GET | `/ping` | Health check |
+| POST | `/predict_flower` | `{sepal_length, sepal_width, petal_length, petal_width}` → `{flower_class, model, timestamp}` |
+| POST | `/feedback_loop` | A list of measurements, each with its correct `flower_class` → retrains the model |
+
+Interactive docs are served at `/`.
+
+## Run it
+```bash
+pip install -r requirements.txt
+python main.py
+```
+The API is then available at http://localhost:8888.
+
+```bash
+curl -s localhost:8888/predict_flower -H 'content-type: application/json' -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
+
+## Tests
+```bash
+pip install -r requirements-dev.txt
+pytest --cov=main --cov=ml_utils
+```
+There are 8 tests: one per species, the timestamp, model selection, the feedback loop and input validation.

@@ -1,63 +1,68 @@
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import List, Literal
+
 import uvicorn
 from fastapi import FastAPI
-from pydantic import BaseModel
-from ml_utils import load_model, predict, retrain
-from typing import List
-from datetime import date, datetime
-today = date.today() 
+from pydantic import BaseModel, Field
 
-# defining the main app
-app = FastAPI(title="Iris Predictor", docs_url="/")
+import ml_utils
 
-# calling the load_model during startup.
-# this will train the model and keep it loaded for prediction.
-app.add_event_handler("startup", load_model)
 
-# class which is expected in the payload
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # train the candidate models on startup and keep the best one loaded
+    ml_utils.load_model()
+    yield
+
+
+app = FastAPI(title="Iris Predictor", docs_url="/", lifespan=lifespan)
+
+FlowerClass = Literal["Iris Setosa", "Iris Versicolour", "Iris Virginica"]
+
+
+# payload for a prediction: all measurements in cm, must be positive
 class QueryIn(BaseModel):
-    sepal_length: float
-    sepal_width: float
-    petal_length: float
-    petal_width: float
+    sepal_length: float = Field(gt=0)
+    sepal_width: float = Field(gt=0)
+    petal_length: float = Field(gt=0)
+    petal_width: float = Field(gt=0)
 
 
-# class which is returned in the response
+# prediction response, with the model used and the time of the prediction (UTC)
 class QueryOut(BaseModel):
-    flower_class: str
+    flower_class: FlowerClass
+    model: str
     timestamp: datetime
-# class which is expected in the payload while re-training
-class FeedbackIn(BaseModel):
-    sepal_length: float
-    sepal_width: float
-    petal_length: float
-    petal_width: float
-    flower_class: str
 
-# Route definitions
+
+# payload for the feedback loop: measurements plus the correct class
+class FeedbackIn(QueryIn):
+    flower_class: FlowerClass
+
+
 @app.get("/ping")
-# Healthcheck route to ensure that the API is up and running
 def ping():
+    """Health check."""
     return {"ping": "pong"}
 
 
 @app.post("/predict_flower", response_model=QueryOut, status_code=200)
-# Route to do the prediction using the ML model defined.
-# Payload: QueryIn containing the parameters
-# Response: QueryOut containing the flower_class predicted (200)
 def predict_flower(query_data: QueryIn):
-    output = {"flower_class": predict(query_data)}
-    return output
+    """Predict the Iris species from the flower's measurements."""
+    return {
+        "flower_class": ml_utils.predict(query_data),
+        "model": ml_utils.model_name,
+        "timestamp": datetime.now(timezone.utc),
+    }
+
 
 @app.post("/feedback_loop", status_code=200)
-# Route to further train the model based on user input in form of feedback loop
-# Payload: FeedbackIn containing the parameters and correct flower class
-# Response: Dict with detail confirming success (200)
 def feedback_loop(data: List[FeedbackIn]):
-    retrain(data)
-    return {"detail": "Feedback loop successful"}
+    """Retrain the model with labelled samples from users."""
+    ml_utils.retrain(data)
+    return {"detail": "Feedback loop successful", "samples_received": len(data)}
 
 
-# Main function to start the app when main.py is called
 if __name__ == "__main__":
-    # Uvicorn is used to run the server and listen for incoming API requests on 0.0.0.0:8888
     uvicorn.run("main:app", host="0.0.0.0", port=8888, reload=True)
